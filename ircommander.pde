@@ -26,7 +26,7 @@
 #define RESOLUTION 20 
 
 // What percent we will allow in variation to match the same code
-#define FUZZINESS 10
+#define FUZZINESS 20
 
 // we will store up to 100 pulse pairs (this is -a lot-)
 uint16_t pulses[100][2];  // pair is high and low pulse 
@@ -56,7 +56,6 @@ void loop(void) {
     if (IRcompare(numberpulses, AppleForwardSignal)) {
     Serial.println("FORWARD");
   }
-
 }
 
 boolean IRcompare(int numpulses, int Signal[]) {
