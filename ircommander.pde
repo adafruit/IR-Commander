@@ -19,6 +19,7 @@
 
 // the maximum pulse we'll listen for - 65 milliseconds is a long time
 #define MAXPULSE 65000
+#define NUMPULSES 50
 
 // what our timing resolution should be, larger is better
 // as its more 'precise' - but too large and you wont get
@@ -29,7 +30,7 @@
 #define FUZZINESS 20
 
 // we will store up to 100 pulse pairs (this is -a lot-)
-uint16_t pulses[100][2];  // pair is high and low pulse 
+uint16_t pulses[NUMPULSES][2];  // pair is high and low pulse 
 uint8_t currentpulse = 0; // index for pulses we're storing
 
 #include "ircodes.h"
@@ -47,54 +48,69 @@ void loop(void) {
   Serial.print("Heard ");
   Serial.print(numberpulses);
   Serial.println("-pulse long IR signal");
-  if (IRcompare(numberpulses, ApplePlaySignal)) {
+  if (IRcompare(numberpulses, ApplePlaySignal,sizeof(ApplePlaySignal)/4)) {
     Serial.println("PLAY");
   }
-    if (IRcompare(numberpulses, AppleRewindSignal)) {
+    if (IRcompare(numberpulses, AppleRewindSignal,sizeof(AppleRewindSignal)/4)) {
     Serial.println("REWIND");
   }
-    if (IRcompare(numberpulses, AppleForwardSignal)) {
+    if (IRcompare(numberpulses, AppleForwardSignal,sizeof(AppleForwardSignal)/4)) {
     Serial.println("FORWARD");
   }
+  delay(500);
 }
 
-boolean IRcompare(int numpulses, int Signal[]) {
-  
-  for (int i=0; i< numpulses-1; i++) {
+//KGO: added size of compare sample. Only compare the minimum of the two
+boolean IRcompare(int numpulses, int Signal[], int refsize) {
+  int count = min(numpulses,refsize);
+  Serial.print("count set to: ");
+  Serial.println(count);
+  for (int i=0; i< count-1; i++) {
     int oncode = pulses[i][1] * RESOLUTION / 10;
     int offcode = pulses[i+1][0] * RESOLUTION / 10;
     
-    /*
+#ifdef DEBUG    
     Serial.print(oncode); // the ON signal we heard
     Serial.print(" - ");
     Serial.print(Signal[i*2 + 0]); // the ON signal we want 
-    */
+#endif   
     
     // check to make sure the error is less than FUZZINESS percent
     if ( abs(oncode - Signal[i*2 + 0]) <= (Signal[i*2 + 0] * FUZZINESS / 100)) {
-      //Serial.print(" (ok)");
+#ifdef DEBUG
+      Serial.print(" (ok)");
+#endif
     } else {
-      //Serial.print(" (x)");
+#ifdef DEBUG
+      Serial.print(" (x)");
+#endif
       // we didn't match perfectly, return a false match
       return false;
     }
     
-    /*
+    
+#ifdef DEBUG
     Serial.print("  \t"); // tab
     Serial.print(offcode); // the OFF signal we heard
     Serial.print(" - ");
     Serial.print(Signal[i*2 + 1]); // the OFF signal we want 
-    */
+#endif    
     
     if ( abs(offcode - Signal[i*2 + 1]) <= (Signal[i*2 + 1] * FUZZINESS / 100)) {
-      //Serial.print(" (ok)");
+#ifdef DEBUG
+      Serial.print(" (ok)");
+#endif
     } else {
-      //Serial.print(" (x)");
+#ifdef DEBUG
+      Serial.print(" (x)");
+#endif
       // we didn't match perfectly, return a false match
       return false;
     }
     
-    //Serial.println();
+#ifdef DEBUG
+    Serial.println();
+#endif
   }
   // Everything matched!
   return true;
@@ -118,7 +134,9 @@ int listenForIR(void) {
        // If the pulse is too long, we 'timed out' - either nothing
        // was received or the code is finished, so print what
        // we've grabbed so far, and then reset
-       if ((highpulse >= MAXPULSE) && (currentpulse != 0)) {
+       
+       // KGO: Added check for end of receive buffer
+       if (((highpulse >= MAXPULSE) && (currentpulse != 0))|| currentpulse == NUMPULSES) {
          return currentpulse;
        }
     }
@@ -130,7 +148,8 @@ int listenForIR(void) {
        // pin is still LOW
        lowpulse++;
        delayMicroseconds(RESOLUTION);
-       if ((lowpulse >= MAXPULSE)  && (currentpulse != 0)) {
+        // KGO: Added check for end of receive buffer
+        if (((lowpulse >= MAXPULSE)  && (currentpulse != 0))|| currentpulse == NUMPULSES) {
          return currentpulse;
        }
     }
@@ -140,7 +159,6 @@ int listenForIR(void) {
     currentpulse++;
   }
 }
-
 void printpulses(void) {
   Serial.println("\n\r\n\rReceived: \n\rOFF \tON");
   for (uint8_t i = 0; i < currentpulse; i++) {
